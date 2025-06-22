@@ -1,0 +1,1117 @@
+/**
+ * Author: Evan Sinelnikov
+ * Date: 18/03/2025
+ * 
+ * Subject: A simulator that simulates the orbits of asteroids, planets, stars, and black holes with the ability to input and change many aspects of the bodies
+ */
+import javax.swing.*;
+import java.awt.event.*;
+import java.awt.*;
+import java.util.ArrayList;
+public class PlanetSimulator {
+    // To initialize the Planet Simulator
+    public static void main(String[]args) {
+        new Initialization();
+    } 
+}
+
+/**
+ * Where the grid is drawn for initial placement of stars and planets
+ */
+class Initialization extends JPanel implements ActionListener {
+    /**
+     * Instance variables for tracking indexes and initialization
+     */
+    private int numOfPlanets, numOfStars; // Tracks the initial number of planets and stars for index
+    private int starIndex = 0, planetIndex = 0; // Tracks order of clicks
+    private boolean placingStars = true; // First places stars, then planets
+    private boolean planetsAndStarsPlaced = false; // To check if all celestial bodies have been placed
+    
+    private static final double scale = Simulator.scale; // Amount of meters per pixel
+    
+    /**
+     * List for all bodies to add any new stars and planets
+     */
+    private static ArrayList<CelestialBody> bodies = Simulator.bodies;
+    
+    JFrame gridLayout = new JFrame("Select stars and planets (Each rectangle is 40Gm high and 66Gm wide)"); // A frame for the initialization grid
+    JButton[][] grid; // Buttons for the grid
+    public Initialization() {
+        initStars(); // Initializes stars
+        
+        initPlanets(); // Initializes planets
+        
+        if (numOfPlanets == 0 && numOfStars == 0) {
+            planetsAndStarsPlaced = true;
+            new UserInterface();
+        }
+        else drawGrid(); // Draws the grid to pick initial positions for stars and planets
+    }
+    
+    private void drawGrid() {
+        gridLayout.setLayout(new GridLayout(40, 40)); // Makes a 40x40 grid for buttons
+        grid = new JButton[40][40];
+        for (int y = 0; y < 40; y++) { 
+            for (int x = 0; x < 40; x++) {
+                grid[x][y]=new JButton(" "); 
+                grid[x][y].addActionListener(this);
+                gridLayout.add(grid[x][y]); // Adds button to grid
+            }
+        }
+        
+        // Sets parameters for grid frame
+        gridLayout.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE); 
+        gridLayout.setExtendedState(JFrame.MAXIMIZED_BOTH);
+        gridLayout.setVisible(true); 
+        gridLayout.setFocusable(true);
+    }
+    
+    // Sets the number of stars and planets at the start
+    private void initStars() {
+        try {
+            numOfStars = Integer.parseInt(JOptionPane.showInputDialog("How many stars do you want initially?"));
+            if (numOfStars < 0) {
+                numOfStars = 0;
+                throw new Exception();
+            }
+        }
+        catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "You must put a positive integer. It has now been set to 0.");
+        }
+    }
+    private void initPlanets() {
+        if (numOfStars == 0) placingStars = false;
+        try {
+            numOfPlanets = Integer.parseInt(JOptionPane.showInputDialog("How many planets do you want initially?")); 
+            if (numOfPlanets < 0) {
+                numOfPlanets = 0;
+                throw new Exception();
+            }
+        }
+        catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "You must put a positive integer. It has now been set to 0.");
+        }
+    }
+    
+    // Loop used to search through grid until a button is pressed and place a star or planet of set attributes in that spot on the screen
+    private void initializePlanetsAndStarsOnClick(ActionEvent e) {
+        for (int y = 0; y < 40; y++) {
+            for (int x = 0; x < 40; x++) {
+                if (e.getSource() == grid[x][y] || (numOfStars == 0 && numOfPlanets == 0)) {
+                    if (placingStars && starIndex < numOfStars) {
+                        double posx = x * 1.65 * 40;
+                        double posy = y * 40;
+                        double mass, radius;
+                        String name;
+                        try {
+                            mass = Double.parseDouble(JOptionPane.showInputDialog("Input the mass (kg) of star #" + (starIndex + 1)));
+                            radius = Double.parseDouble(JOptionPane.showInputDialog("Input the radius (m) of star #" + (starIndex + 1)));
+                            name = JOptionPane.showInputDialog("Input the name of star #" + (starIndex + 1));
+                        }
+                        catch (Exception ex) {
+                            JOptionPane.showMessageDialog(null, "You must put a positive decimal (or xEx format). The star has been skipped.");
+                            return;
+                        }
+                        
+                        CelestialBody star = new Star(posx, posy, mass, radius, name);
+                        
+                        Simulator.placeInBodies(star);
+                        
+                        // Calculates the initial tangential velocity for stars
+                        if (starIndex >= 1) {
+                            star.calculateInitVelocity(bodies.get(starIndex - 1), scale);
+                        }
+                        else if (starIndex == 1) {
+                            bodies.get(0).calculateInitVelocity(bodies.get(1), scale);
+                            bodies.get(1).calculateInitVelocity(bodies.get(0), scale);
+                        }
+                        
+                        grid[x][y].setBackground(star.color); // Color to represent stars
+                        starIndex++;
+                        if (starIndex == numOfStars) {
+                            placingStars = false; // Switch to placing planets
+                        }
+                    } 
+                    else if (!placingStars && planetIndex < numOfPlanets) {
+                        double posx = x * 1.65 * 40;
+                        double posy = y * 40;
+                        double mass, radius;
+                        String name;
+                        try {
+                            mass = Double.parseDouble(JOptionPane.showInputDialog("Input the mass (kg) of planet #" + (planetIndex + 1)));
+                            radius = Double.parseDouble(JOptionPane.showInputDialog("Input the radius (m) of planet #" + (planetIndex + 1)));
+                            name = JOptionPane.showInputDialog("Input the name of planet #" + (planetIndex + 1));
+                        }
+                        catch (Exception ex) {
+                            JOptionPane.showMessageDialog(null, "You must put a positive decimal (or xEx format). The planet has been skipped.");
+                            return;
+                        }
+                        
+                        CelestialBody planet = new Planet(posx, posy, mass, radius, name);
+                        
+                        Simulator.placeInBodies(planet);
+                        
+                        // Calculates the initial tangential velocity for planets
+                        if (numOfStars > 0) planet.calculateInitVelocity(Simulator.findClosest(planet), scale);
+                        
+                        grid[x][y].setBackground(planet.color); // Color to represent planets
+                        planetIndex++;
+                    }
+                    planetsAndStarsPlaced = starIndex == numOfStars && planetIndex == numOfPlanets; // Once true stops the checking
+                    if (planetsAndStarsPlaced) {
+                        new UserInterface();
+                    }
+                    return; // Stop checking after finding the clicked button
+                }
+            }
+        }
+    }
+    
+    // Main button check loop
+    public void actionPerformed(ActionEvent e) {
+        if (!planetsAndStarsPlaced) initializePlanetsAndStarsOnClick(e);
+    }
+}
+/**
+ * Where the frame is drawn along with all bodies and UI elements
+ */
+class UserInterface extends JPanel implements KeyListener, MouseWheelListener, MouseMotionListener, MouseListener {
+    Simulator sim; // An object of the simulator that is initialized in the constructor
+    
+    /**
+     * Instance variables for tracking and changing UI elements, and converting from the simulator to the screen
+     */
+    private boolean directionsOn = true; // Starts with the directions text on and can be toggled with E
+    private double[] offset, offsetVelocity; // The change in initial camera position
+    private double[] mousePos; // XY position of mouse on frame
+    private double[][] randPos; // Array of random positions for background stars
+    private double zoomFactor = 1; // How much things should scale changed by the scroll wheel (The zoom)
+    
+    private boolean drawTrails = true; // Whether it draws orbital trails behind bodies
+    
+    protected static final double scale = 1E9; // Amount of meters per pixel
+    
+    
+    /**
+     * List for all bodies in general to make the drawing more compact and efficient
+     */
+    private static ArrayList<CelestialBody> bodies;
+    
+    JFrame frame;
+    public UserInterface() {
+        // Creates the main frame for all elements to be drawn in
+        frame = new JFrame("Planet Simulator");
+        frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE); // Makes sure program stops when closed
+        frame.getContentPane().add(this);
+        
+        // Sets and initializes values for camera and mouse
+        mousePos = new double[2];
+        offset = new double[2];
+        offset[0] = ((double)getWidth() / 2) - 66;
+        offset[1] = ((double)getHeight() / 2) - 40;   
+        offsetVelocity = new double[2];
+        
+        randPos = randomPos(70); // Sets a certain amount of random positions for randPos array
+        
+        // Creates the simulator and assigns variables to their same counterpart in Simulator
+        sim = new Simulator(this);
+        bodies = Simulator.bodies;
+        
+        this.setBackground(Color.black); // Sets background of sim to black
+        
+        // Adds many listeners and changes the frame for use
+        this.addKeyListener(this);
+        this.addKeyListener(sim);
+        this.addMouseWheelListener(this);
+        this.addMouseMotionListener(this);
+        this.addMouseListener(this);
+        this.setFocusable(true);
+        
+        frame.setVisible(true);
+    }
+    
+    // Draws the directions that can be put away using E
+    private void drawDirections(Graphics g) {
+        g.setColor(Color.GREEN);
+        g.setFont(new Font("TIMES_NEW_ROMAN", 40, 40));
+        g.drawString("\tPlanet Simulator Directions:", getWidth() / 2 - 220, 65);
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("TIMES_NEW_ROMAN", 20, 18));
+        g.drawString("When first starting, use the grid to select where the stars and planets are\n", getWidth() / 2 - 270, 95);
+        g.drawString("The mouse wheel, Z, and X zoom in and out, (,) and (.) decrease and increase the timescale (SPACE to pause), "
+        + "arrow keys and dragging move the camera\n", getWidth() / 2 - 615, 120);
+        g.drawString("A, P, S, and B spawn asteroids, planets, stars, and blackholes on the mouse (DELETE to clear), "
+        + "with K and L used to decrease and increase their initial speed", getWidth() / 2 - 627, 145);
+        g.drawString("Press T to change between random initial directions and tangential orbits to the closest larger body\n", getWidth() / 2 - 385, 170);
+        g.drawString("Press Y to change between orbiting planets of same tier initially and press U to toggle orbital trails\n", getWidth() / 2 - 382, 195);
+        g.drawString("Right click on a body to see and change its values\n", getWidth() / 2 - 183, 220);
+        g.setColor(Color.GREEN);
+        g.setFont(new Font("TIMES_NEW_ROMAN", 20, 25));
+        g.drawString("(Press E to hide or bring back)", getWidth() / 2 - 150, 255);
+    }
+    
+    // Draws text for info
+    private void drawText(Graphics g) {
+        g.setColor(Color.GREEN);
+        g.setFont(new Font("TIMES_NEW_ROMAN", 20, 18));
+        g.drawString(sim.convertTimeAndScale(drawTrails, zoomFactor), 7, 20);
+        if (directionsOn) {
+            drawDirections(g);
+        }
+    }
+    
+    // Sets random positions for background stars
+    private double[][] randomPos(int length) {
+        double[][] pos = new double[length][2];
+        for (int i = 0; i < length; i++) {
+            pos[i][0] = Math.random();
+            pos[i][1] = Math.random();
+        }
+        return pos;
+    }
+    private void drawBackground(Graphics g) {
+        g.setColor(Color.WHITE);
+        int height = getHeight(), width = getWidth();
+        for (double[] pos : randPos) {
+            g.fillOval((int)(pos[0] * width), (int)(pos[1] * height), 2, 2);
+        }
+    }
+    
+    @Override
+    // Visual components
+    public void paint(Graphics g) {
+        super.paint(g);
+        moveCamera();
+        drawBackground(g);
+        drawBodies(g);
+        drawText(g);
+    }
+    
+    private void moveCamera() {
+        offset[0] += offsetVelocity[0];
+        offset[1] += offsetVelocity[1];
+    }
+    
+    // To do something when a key is pressed
+    public void keyPressed(KeyEvent k) {
+        int key = k.getKeyCode(); // Gets a value associated with the key on the keyboard
+        switch (key) {
+            // Camera controls
+            case KeyEvent.VK_LEFT:
+                offsetVelocity[0] = 5;
+                break;
+            case KeyEvent.VK_RIGHT:
+                offsetVelocity[0] = -5;
+                break;
+            case KeyEvent.VK_UP:
+                offsetVelocity[1] = 5;
+                break;
+            case KeyEvent.VK_DOWN:
+                offsetVelocity[1] = -5;
+                break;
+                
+            case KeyEvent.VK_E: // Turns on and off the direction with E
+                directionsOn = !directionsOn;
+                break;
+
+            case KeyEvent.VK_U: // Enables and disables the bodies being able to orbit bodies of the same tier initially with Y
+                drawTrails = !drawTrails;
+                break;
+            
+            // Alternate zoom from mouse wheel
+            case KeyEvent.VK_Z:
+                double prevZoom = zoomFactor;
+    
+                zoomFactor /= 1.1;
+                zoomFactor = Math.max(0.005, Math.min(1E9, zoomFactor)); // Prevents zoom from going negative or zero
+    
+                // Gets the center of the frame
+                double centerX = (double)getWidth() / 2;
+                double centerY = (double)getHeight() / 2;
+            
+                // Adjust the offset so zoom is centered around screen center
+                offset[0] = (offset[0] - centerX) * (zoomFactor / prevZoom) + centerX;
+                offset[1] = (offset[1] - centerY) * (zoomFactor / prevZoom) + centerY;
+                break;
+            case KeyEvent.VK_X:
+                prevZoom = zoomFactor;
+    
+                zoomFactor *= 1.1;
+                zoomFactor = Math.max(0.005, Math.min(1E9, zoomFactor)); // Prevents zoom from going negative or zero
+    
+                // Gets the center of the frame
+                centerX = (double)getWidth() / 2;
+                centerY = (double)getHeight() / 2;
+            
+                // Adjust the offset so zoom is centered around screen center
+                offset[0] = (offset[0] - centerX) * (zoomFactor / prevZoom) + centerX;
+                offset[1] = (offset[1] - centerY) * (zoomFactor / prevZoom) + centerY;
+                break;
+        }
+        repaint();
+    }
+    public void keyReleased(KeyEvent k) {
+        int key = k.getKeyCode();
+        
+        // Stops camera movement after release
+        switch (key) {
+            case KeyEvent.VK_LEFT:
+                offsetVelocity[0] = 0;
+                break;
+            case KeyEvent.VK_RIGHT:
+                offsetVelocity[0] = 0;
+                break;
+            case KeyEvent.VK_UP:
+                offsetVelocity[1] = 0;
+                break;
+            case KeyEvent.VK_DOWN:
+                offsetVelocity[1] = 0;
+                break;
+        }
+        repaint();
+    }
+    public void keyTyped(KeyEvent k) {}
+    
+    // Gets XY position of mouse
+    public void mouseMoved(MouseEvent m) {
+        mousePos[0] = m.getX();
+        mousePos[1] = m.getY();
+        repaint();
+    }
+    
+    // To scroll the screen using the mouse
+    public void mouseDragged(MouseEvent m) {
+        offset[0] += m.getX() - mousePos[0];
+        offset[1] += m.getY() - mousePos[1];
+        
+        mousePos[0] = m.getX();
+        mousePos[1] = m.getY();
+        
+        repaint();
+    }
+    
+    // To change zoom using the mouse wheel (Doesn't work with laptop touchpad!!!!! Use Z and X)
+    public void mouseWheelMoved(MouseWheelEvent m) {
+        double prevZoom = zoomFactor;
+        double zoomChange = m.getPreciseWheelRotation() / 1.07; // Gets a value associated with a movement of the wheel
+    
+        zoomFactor *= zoomChange > 0 ? zoomChange : 1 / -zoomChange;
+        zoomFactor = Math.max(0.005, Math.min(1E9, zoomFactor)); // Prevents zoom from going negative or zero
+    
+        // Gets the center of the frame
+        double centerX = (double)getWidth() / 2;
+        double centerY = (double)getHeight() / 2;
+    
+        // Adjust the offset so zoom is centered around the mouse cursor
+        offset[0] = (offset[0] - mousePos[0]) * (zoomFactor / prevZoom) + mousePos[0];
+        offset[1] = (offset[1] - mousePos[1]) * (zoomFactor / prevZoom) + mousePos[1];
+    
+        repaint();
+    }
+    
+    // Checks if a body is under the mouse on a right click to bring up its context menu
+    public void mouseClicked(MouseEvent m) {
+        if (m.getButton() != m.BUTTON3) return;
+        double x = m.getX(), y = m.getY();
+        
+        for (int i = 0; i < bodies.size(); i++) {
+            CelestialBody body = bodies.get(i);
+            
+            // Converts the sim values of the body to the screen
+            double screenX = body.x * zoomFactor + offset[0];
+            double screenY = body.y * zoomFactor + offset[1];
+            double screenRadius = body.radius * zoomFactor / scale;
+
+            double dx = x - screenX;
+            double dy = y - screenY;
+            
+            if (dx * dx + dy * dy <= screenRadius * screenRadius) {
+                body.menu.frame.setVisible(true);
+                return;
+            }
+        }
+    }
+    public void mouseExited(MouseEvent m) {}
+    public void mouseEntered(MouseEvent m) {}
+    public void mouseReleased(MouseEvent m) {}
+    public void mousePressed(MouseEvent m) {}
+    
+    // Draws all bodies from the bodies list
+    private void drawBodies(Graphics g) {
+        for (int i = 0; i < bodies.size(); i++) {
+            CelestialBody body = bodies.get(i);
+                
+            if (drawTrails) body.drawTrail(g, offset[0], offset[1], zoomFactor);
+            body.drawBody(g, offset[0], offset[1], zoomFactor);
+        }
+    }
+    
+    // To convert to the sim class when placing new bodies
+    public double determineXCoordinateOfNewBody() {
+        return (mousePos[0] - offset[0]) / zoomFactor;
+    }
+    public double determineYCoordinateOfNewBody() {
+        return (mousePos[1] - offset[1]) / zoomFactor;
+    }
+}
+/**
+ * Brings up a menu when right clicking a body that can change its values
+ */
+class ContextMenu extends JPanel implements ActionListener {
+    JFrame frame;
+    JLabel name, mass, radius, heading;
+    JTextField newName, newMass, newRadius;
+    JButton setValues;
+    CelestialBody body;
+    
+    public ContextMenu(CelestialBody body) {
+        // Initializes all text fields, labels, and buttons
+        name = new JLabel("Name: " + body.name);
+        newName = new JTextField();
+        mass = new JLabel("Mass: " + String.format("%.3e", body.mass) + "kg");
+        newMass = new JTextField();
+        radius = new JLabel("Radius: " + String.format("%.3e", body.radius) + "m");
+        newRadius = new JTextField();
+        heading = new JLabel("Empty boxes wont change values");
+        setValues = new JButton("Set Values");
+        
+        // Sets the text color to green
+        name.setForeground(Color.GREEN);
+        mass.setForeground(Color.GREEN);
+        radius.setForeground(Color.GREEN);
+        heading.setForeground(Color.GREEN);
+        setValues.setForeground(Color.GREEN);
+        setValues.setBackground(Color.BLACK);
+        
+        // Makes the context menu frame and adds all elements to it
+        frame = new JFrame(body.name + " Values (Leave empty to keep current)");
+        name.setBounds(45, 50, 150, 20);
+        newName.setBounds(195, 50, 100, 20);
+        mass.setBounds(45, 100, 150, 20);
+        newMass.setBounds(195, 100, 100, 20);
+        radius.setBounds(45, 150, 150, 20);
+        newRadius.setBounds(195, 150, 100, 20);
+        heading.setBounds(70, 10, 250, 20);
+        setValues.setBounds(115, 200, 100, 20);
+        this.setLayout(null);
+        this.add(name);this.add(newName);this.add(mass);
+        this.add(newMass);this.add(radius);this.add(newRadius);
+        this.add(heading);this.add(setValues);
+        frame.setContentPane(this);
+        frame.setSize(350,350);
+        frame.setLocation(0, 50);
+        frame.getContentPane().setBackground(Color.BLACK);
+        newName.addActionListener(this);
+        newMass.addActionListener(this);
+        newRadius.addActionListener(this);
+        setValues.addActionListener(this);
+        
+        this.body = body;
+    }
+    
+    public void actionPerformed(ActionEvent e)
+    {
+        String name = newName.getText();
+        double mass;
+        try {
+            mass = Double.parseDouble(newMass.getText());
+        }
+        catch (Exception ex) {
+            mass = 0;
+        }
+        
+        double radius;
+        try {
+            radius = Double.parseDouble(newRadius.getText());
+        }
+        catch (Exception ex) {
+            radius = 0;
+        }
+        
+        // Changes the name, mass, and radius when the set values button is clicked
+        if (e.getSource() == setValues) {
+            if (!name.isEmpty()) body.name = name;
+            if (mass != 0) body.mass = mass;
+            if (radius != 0) body.radius = radius;
+            
+            // Checks if the star's color needs to change based on mass
+            if (body.tier == 3) {
+                Star s = (Star)body;
+                s.checkColor(); 
+            }
+            
+            closeMenu(body);
+            body.menu = new ContextMenu(body);
+            body.menu.frame.setVisible(true);
+        }
+    }
+    
+    @Override
+    public void paint(Graphics g) {
+        super.paint(g);
+        if (body.tier == 4) {
+            g.setColor(Color.ORANGE);
+            g.drawOval(145, 240, 50, 50);
+        }
+        else {
+            g.setColor(body.color);
+            g.fillOval(145, 240, 50, 50);
+        }
+    }
+    
+    // Closes the menu when a body is removed and updates if there is a combination
+    public static void closeMenu(CelestialBody body) {
+        body.menu.frame.setVisible(false);
+        body.menu.frame.dispose();
+    }
+    public static void closeMenu(CelestialBody remove, CelestialBody add) {
+        remove.menu.frame.setVisible(false);
+        remove.menu.frame.dispose();
+        add.menu.frame.setVisible(false);
+        add.menu = new ContextMenu(add);
+    }
+}
+/**
+ * Where the calculations and computation is done for the bodies
+ */
+class Simulator extends JPanel implements ActionListener, KeyListener {
+    UserInterface ui; // An object of the ui for placing the bodies in the correct spot on the screen
+    
+    /**
+     * Physics constants and variables to convert simulation to camera and compare to real-world distances
+     */
+    public static final double G = 6.6743E-11; // Gravitational constant
+    protected static final double scale = UserInterface.scale; // Amount of meters per pixel
+    protected double timestep = 7.2; // Amount of simseconds per 2 milliseconds (One update cycle: can be changed through , to go down and . to go up)
+    private double prevTime = timestep; // To store the time before pausing
+    protected static double initSpeed = 1; // Initial speed of the bodies spawned through the keyboard (Can be changed by pressing K to go down and L to go up) 
+    private boolean randInitVelOn = false; // Changes between initially orbiting around the nearest body 
+    private static boolean orbitEachOther = false; // Allows initial orbit around a body of the same tier
+    
+    /**
+     * List for all bodies in general to make the physics more compact and efficient
+     */
+    protected static ArrayList<CelestialBody> bodies = new ArrayList<>();
+    
+    Timer t = new Timer(2, this); // Updates the sim every 2 milliseconds
+    JFrame frame;
+    public Simulator(UserInterface user) {
+        t.setCoalesce(false);  // reduce skipped events
+        t.start(); // Starts timer
+        
+        ui = user;
+        
+        frame = user.frame;
+    }
+
+    // Main sim loop
+    public void actionPerformed(ActionEvent e) { 
+        if (timestep != 0) moveBodies();
+        ui.repaint();
+    }
+    
+    // Converts the text for the scale, time, and initial speed to be more readable
+    public String convertTimeAndScale(boolean drawTrails, double zoomFactor) {
+        String scaleText;
+        String timeText;
+        String speedText;
+        String randVel = "Random Direction: " + randInitVelOn;
+        String orbitSameTier = ", Orbit Same Tier: " + orbitEachOther;
+        String orbitalTrails = ", Orbital Trails: " + drawTrails;
+        
+        if (frame.getWidth() * scale / zoomFactor >= 1.496E11) {
+            scaleText = "Scale: " + String.format("%.3f", frame.getWidth() * scale / (zoomFactor * 1.496E11)) + "AU/screenwidth, ";
+        }
+        else if (frame.getWidth() * scale / zoomFactor >= 1E9) {
+            scaleText = "Scale: " + String.format("%.3f", frame.getWidth() * scale / (zoomFactor * 1E9)) + "Gm/screenwidth, ";
+        }
+        else if (frame.getWidth() * scale / zoomFactor >= 1E6) {
+            scaleText = "Scale: " + String.format("%.3f", frame.getWidth() * scale / (zoomFactor * 1E6)) + "Mm/screenwidth, ";
+        }
+        else if (frame.getWidth() * scale / zoomFactor >= 1E4) {
+            scaleText = "Scale: " + String.format("%.3f", frame.getWidth() * scale / (zoomFactor * 1E4)) + "km/screenwidth, ";
+        }
+        else {
+            scaleText = "Scale: " + String.format("%.3f", frame.getWidth() * scale / zoomFactor) + "m/screenwidth, ";
+        }
+        
+        if (timestep * 500 >= 60 * 60 * 24 * 365) {
+            timeText = "Timescale: " + String.format("%.2f", (timestep * 500) / (60 * 60 * 24 * 365)) + "simyear(s)/s, ";
+        }
+        else if (timestep * 500 >= 60 * 60 * 24) {
+            timeText = "Timescale: " + String.format("%.2f", (timestep * 500) / (60 * 60 * 24)) + "simday(s)/s, ";
+        }
+        else if (timestep * 500 >= 60 * 60) {
+            timeText = "Timescale: " + String.format("%.2f", (timestep * 500) / (60 * 60)) + "simhour(s)/s, ";
+        }
+        else if (timestep * 500 >= 60) {
+            timeText = "Timescale: " + String.format("%.2f", (timestep * 500) / 60) + "simminute(s)/s, ";
+        }
+        else {
+            timeText = "Timescale: " + String.format("%.2f", (timestep * 500)) + "simsecond(s)/s, ";
+        }
+        
+        if (initSpeed >= 1E6) {
+            speedText = "Initial Speed: " + String.format("%.3f", initSpeed / 1E6) + "Mm/s, ";
+        }
+        else if (initSpeed >= 1E3) {
+            speedText = "Initial Speed: " + String.format("%.3f", initSpeed / 1E3) + "km/s, ";
+        }
+        else {
+            speedText = "Initial Speed: " + String.format("%.3f", initSpeed) + "m/s, ";
+        }
+        
+        return scaleText + timeText + speedText + randVel + orbitSameTier + orbitalTrails;
+    }
+    
+    // Changes minimum distance to keep orbit and prevent division by zero
+    private double checkDistanceNonZeroX(double dx, double dy) {
+        if (Math.abs(dx) < 1E-6) {
+            return ((dy > 0) ? 1E-6 : -1E-6);
+        }
+        return dx;
+    }
+    private double checkDistanceNonZeroY(double dx, double dy) {
+        if (Math.abs(dy) < 1E-6) {
+            return ((dx > 0) ? 1E-6 : -1E-6);
+        }
+        return dy;
+    }
+    
+    // Creates black hole on collision of two stars of sufficent mass
+    private void createBlackHole(CelestialBody body1, CelestialBody body2) {
+        BlackHole b = new BlackHole(body1.x, body1.y, body1.mass + body2.mass, Math.max(body1.radius, body2.radius));
+        
+        // Conservation of momentum
+        b.velx = (body1.mass * body1.velx + body2.mass * body2.velx) / (body1.mass + body2.mass);
+        b.vely = (body1.mass * body1.vely + body2.mass * body2.vely) / (body1.mass + body2.mass);
+        
+        // Adds black hole and removes stars
+        placeInBodies((CelestialBody)b);
+        bodies.remove(body2);
+        bodies.remove(body1);
+        
+        ContextMenu.closeMenu(body1);
+        ContextMenu.closeMenu(body2);
+    }
+    
+    // Combines two bodies into one, returning the one to be removed
+    private int combine(CelestialBody a, CelestialBody b, int i, int j) {
+        CelestialBody body = (((Math.hypot(a.velx, a.vely) > Math.hypot(b.velx, b.vely) && b.radius > a.radius && b.tier == a.tier) || 
+        (b.radius > a.radius && b.tier == a.tier)) || b.tier > a.tier) ? b : a; // Sets the main body based on the tier, radius, and speed
+        
+        CelestialBody removed = (body == a) ? b : a; // Sets which body to be deleted
+        
+        // Conservation of momentum
+        body.velx = (body.mass * body.velx + removed.mass * removed.velx) / (body.mass + removed.mass);
+        body.vely = (body.mass * body.vely + removed.mass * removed.vely) / (body.mass + removed.mass);
+        
+        // Adds the masses to the first body and removes the second
+        body.mass += removed.mass;
+        bodies.remove(removed);
+        
+        // Checks if the star's color needs to change based on mass
+        if (body.tier == 3) {
+            Star s = (Star)body;
+            s.checkColor(); 
+        }
+        
+        ContextMenu.closeMenu(removed, body);
+        
+        return removed == b ? (i > j ? 3 : 0) : 1;
+    }
+    
+    // Main simulator loop that actively changes the bodies ArrayList to reflect changes and moves bodies based on planetary physics
+    private int simulator(CelestialBody body1, int i) {
+        int check = 0;
+        for (int j = 0; j < bodies.size(); j++) {
+            if (i == j) continue; // To not apply physics on itself
+            
+            CelestialBody body2 = bodies.get(j);
+            
+            double dx = (body2.x - body1.x) * scale; // Horizontal distance between bodies
+            double dy = (body2.y - body1.y) * scale; // Vertical distance between bodies
+            
+            double radius = Math.sqrt(dx * dx + dy * dy);
+            
+            // Used to prevent too big steps that would cross the collision radius
+            double v1 = Math.hypot(body1.velx - body2.velx, body1.vely - body2.vely);
+            
+            double maxMove = v1 * timestep;
+            
+            double touchRadius = body1.radius + body2.radius + maxMove; // To prevent an overstep of the collision radius due to a large timescale
+            
+            // Collision check
+            if (radius <= touchRadius) {
+                //if (body1.testCollision(body2, timestep, scale)) {
+                    // Creates a black hole
+                    if (body1.tier == 3 && body2.tier == 3 && body1.mass + body2.mass >= 7.3 * 2E31) {
+                        createBlackHole(body1, body2);
+                        return i > j ? 2 : 1;
+                    }
+                    // Checks other types of collisions
+                    else {
+                        // Stores the amount the index of the ArrayList in moveBodies() needs to be decremented and the values shows how and when
+                        check = combine(body1, body2, i, j);
+                        return check;
+                    }
+                //}
+            }
+            
+            double acceleration = G * body2.mass / (radius * radius); // Acceleration due to gravity
+            
+            dx = checkDistanceNonZeroX(dx, dy);
+            dy = checkDistanceNonZeroY(dx, dy);
+            
+            body1.applyAccel(acceleration * (dx / radius), acceleration * (dy / radius), timestep); // Applies the acceleration in the x and y directions
+        }
+        return check; // Return type is used to backtrack on ArrayList index based on changes
+    }
+    
+    // Applies simulator to all bodies
+    private void moveBodies() {
+        for (int i = 0; i < bodies.size(); i++) {             
+            CelestialBody body = bodies.get(i);
+            
+            // To overall track the change in index
+            int temp = i;
+            
+            // Decrements the index based on what elements were removed from the bodies list
+            i -= simulator(body, i);
+            if (i == temp - 3) i += 2;
+            else if (i != temp) continue;
+            
+            body.prevPosIndex = body.prevPosIndex < 500 ? body.prevPosIndex : 0;
+            body.prevPos[body.prevPosIndex][0] = body.x;
+            body.prevPos[body.prevPosIndex][1] = body.y;
+            body.prevPosIndex++;
+            
+            body.applyVelocity(scale, timestep);
+        }
+        repaint();
+    }
+    
+    // Find the closest body to another for initial velocity
+    public static CelestialBody findClosest(CelestialBody center) {
+        CelestialBody closest = center;
+        for (CelestialBody  body : bodies) {
+            if (body == center) continue;
+            
+            boolean orbitSameTier = orbitEachOther ? body.tier >= center.tier : body.tier > center.tier;
+            if (((Math.hypot(body.x - center.x, body.y - center.y) < Math.hypot(closest.x - center.x, closest.y - center.y) || closest == center) && orbitSameTier)) closest = body;
+        }
+        return closest;
+    }
+    
+    // To do something when a key is pressed
+    public void keyPressed(KeyEvent k) {
+        int key = k.getKeyCode(); // Gets a value associated with the key on the keyboard
+        switch (key) {    
+            // Timestep controls
+            case KeyEvent.VK_COMMA:
+                timestep = timestep / 1.1 > 1.8E-6 ? timestep / 1.1 : 1.8E-6;
+                break;
+            case KeyEvent.VK_PERIOD:
+                timestep = timestep * 1.1 < 1.8E6 ? timestep * 1.1 : 1.8E6;
+                break;
+        
+            case KeyEvent.VK_DELETE: // Clears the simulator
+                bodies.forEach((b) -> ContextMenu.closeMenu(b)); // Closes all context menus for bodies
+                bodies.clear();
+                break;
+            case KeyEvent.VK_SPACE: // Pauses the simulator
+                prevTime = timestep == 0 ? prevTime : timestep;
+                timestep = timestep != 0 ? 0 : prevTime;
+                break;
+                
+            // Changes parameters of spawning bodies
+            case KeyEvent.VK_T: // Changes between random direction of intial speed and tangential orbit with T
+                randInitVelOn = !randInitVelOn;
+                break;
+            case KeyEvent.VK_Y: // Enables and disables the bodies being able to orbit bodies of the same tier initially with Y
+                orbitEachOther = !orbitEachOther;
+                break;
+                
+            // These cases add bodies with random parameters based on their first letter pressed on the keyboard
+            case KeyEvent.VK_A:
+                double radius = Math.random() * 1E6 + 1E4;
+                double mass = Math.pow(radius, 3.23);
+                double x = ui.determineXCoordinateOfNewBody();
+                double y = ui.determineYCoordinateOfNewBody();
+                CelestialBody a = new Asteroid(x, y, mass, radius);
+                CelestialBody c = findClosest(a);
+                if (randInitVelOn || c == a) a.calculateInitVelocityRandom();
+                else a.calculateInitVelocity(c, scale);
+                placeInBodies(a);
+                break;
+            case KeyEvent.VK_P:
+                radius = Math.random() * 5E7 + 1E6;
+                mass = Math.pow(radius, 3.53);
+                x = ui.determineXCoordinateOfNewBody();
+                y = ui.determineYCoordinateOfNewBody();
+                CelestialBody p = new Planet(x, y, mass, radius);
+                c = findClosest(p);
+                if (randInitVelOn || c == p) p.calculateInitVelocityRandom();
+                else p.calculateInitVelocity(c, scale);
+                placeInBodies(p);
+                break;
+            case KeyEvent.VK_S:
+                radius = Math.random() * 7E10 + 1E8;
+                mass = Math.pow(radius, 2.94);
+                x = ui.determineXCoordinateOfNewBody();
+                y = ui.determineYCoordinateOfNewBody();
+                CelestialBody s = new Star(x, y, mass, radius);
+                c = findClosest(s);
+                if (randInitVelOn || c == s) s.calculateInitVelocityRandom();
+                else s.calculateInitVelocity(c, scale);
+                placeInBodies(s);
+                break;
+            case KeyEvent.VK_B:
+                radius = Math.random() * 9E11 + 9E9;
+                mass = radius * 6.7426E26;
+                x = ui.determineXCoordinateOfNewBody();
+                y = ui.determineYCoordinateOfNewBody();
+                CelestialBody b = new BlackHole(x, y, mass, radius);
+                placeInBodies(b);
+                break;
+                
+            // Increases or decreases the initial speed of orbits
+            case KeyEvent.VK_K:
+                initSpeed /= 1.5;
+                break;
+            case KeyEvent.VK_L:
+                initSpeed = initSpeed * 1.5 < 3.6E6 ? initSpeed * 1.5 : 1E9;
+                break;
+        }
+        ui.repaint();
+    }
+    public void keyTyped(KeyEvent k) {}
+    public void keyReleased(KeyEvent k) {}
+    
+    // Places a body in a sorted spot based on tier so there is a clear drawing hierarchy
+    public static void placeInBodies(CelestialBody body) {
+        int i = 0, length = bodies.size();
+        if (length == 1) i = bodies.get(i).tier <= body.tier ? 0 : -1;
+        while (i <= length - 2 && bodies.get(i + 1).tier <= body.tier) {
+            i++;
+        }
+        i = length == 0 ? -1 : i;
+        bodies.add(i + 1, body);
+    }   
+}
+/**
+ * Subject: The super class for different celestial bodies with features like x y position, mass, and radius
+ */
+class CelestialBody {
+    protected double x, y, mass, radius, velx, vely; // Parameters associated with the body
+    protected Color color; // Color of the body
+    protected int tier; // Determines what happens during collision
+    protected double[][] prevPos; // Stored past positions to draw a trail
+    protected int prevPosIndex = 0;
+    protected String name;
+    private ArrayList<CelestialBody> bodies = Simulator.bodies;
+    
+    ContextMenu menu;
+    public CelestialBody(double x, double y, double mass, double radius) {
+        this.x = x;
+        this.y = y;
+        this.mass = mass;
+        this.radius = radius;
+        velx = 0;
+        vely = 0;
+        prevPos = new double[500][2];
+    }
+    
+    // Changes the position based on velocity accounting for the scale and timestep
+    public void applyVelocity(double scale, double timestep) {
+        x += velx * timestep / scale;
+        y += vely * timestep / scale;
+    }
+    
+    // Changes the overall acceleration of the planet
+    public void applyAccel(double accelx, double accely, double timestep) {
+        velx += accelx * timestep;
+        vely += accely * timestep;
+        
+        if (Math.hypot(velx, vely) >= 1.29E8 && timestep != 0) bodies.remove(this);
+    }
+    
+    // To calculate the initial tangential velocity to the nearest tier + 1 body
+    public void calculateInitVelocity(CelestialBody host, double scale) {
+        double dx = Math.abs((host.x - x)) * scale; // Horizontal distance between bodies
+        double dy = Math.abs((host.y - y)) * scale; // Vertical distance between bodies
+        
+        double radius = Math.sqrt(dx * dx + dy * dy);
+        if (radius == 0) return;
+                
+        double orbitalSpeed = Math.sqrt(Simulator.G * host.mass / radius); // Physics equation for orbital speed
+        
+        // Property of tangential vector application
+        velx = -orbitalSpeed * (dy/radius) + host.velx;
+        vely = orbitalSpeed * (dx/radius) + host.vely;
+    }
+    
+    // Calculates a random direction for the set initial speed
+    public void calculateInitVelocityRandom() {        
+        double speed = Simulator.initSpeed;
+        double randSpeed = Math.random() * speed;
+        velx = randSpeed > speed/2 ? randSpeed : -randSpeed;
+        vely = Math.random() * 2 > 1 ? Math.sqrt(speed * speed - velx * velx + 1E-6) : -Math.sqrt(speed * speed - velx * velx + 1E-6);
+    }
+    
+    // Draws trails behind bodies, can be toggled with U
+    public void drawTrail(Graphics g, double offsetx, double offsety, double zoomFactor) {
+        g.setColor(color);
+        if (tier == 4) g.setColor(Color.ORANGE);
+        
+        for (int i = 0; i < prevPos.length; i++) {
+            if (prevPos[i][0] == 0 && prevPos[i][1] == 0) continue;
+            
+            int camX = (int)((prevPos[i][0] * zoomFactor) + offsetx);
+            int camY = (int)((prevPos[i][1] * zoomFactor) + offsety);
+            
+            g.fillOval(camX, camY, 2, 2);
+        }
+    }
+    
+    // Substeps the timestep to have more accuracy when two bodies are close and fast
+    public boolean testCollision(CelestialBody body, double timestep, double scale) {
+        double x = this.x, y = this.y , substeps = Math.sqrt((Math.hypot(velx, vely) * timestep)), substep = timestep / substeps;
+        
+        for (int i = 0; i < (int)substeps; i++) {
+            x += velx * substep / scale;
+            y += vely * substep / scale;
+            
+            double dx = (body.x - x) * scale; // Horizontal distance between bodies
+            double dy = (body.y - y) * scale; // Vertical distance between bodies
+            
+            double distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Used to prevent too big steps that would cross the collision radius
+            double v1 = Math.hypot(body.velx - velx, body.vely - vely);
+            
+            double maxMove = v1 * substep;
+            
+            double touchRadius = body.radius + radius + maxMove; // To prevent an overstep of the collision radius due to a large timescale
+            
+            if (distance <= touchRadius) return true;
+        }
+        return false;
+    }
+    
+    // To draw the body based on zoom and camera position
+    public void drawBody(Graphics g, double offsetx, double offsety, double zoomFactor) {
+        int diameter = 2 * radius * zoomFactor / Simulator.scale > 4 ? (int)(2 * radius * zoomFactor / Simulator.scale) : 4;
+        int camX = (int)((x * zoomFactor) + offsetx - diameter / 2);
+        int camY = (int)((y * zoomFactor) + offsety - diameter / 2);
+        g.setColor(color);
+        
+        g.fillOval(camX, camY, diameter, diameter);
+        
+        // Draw black hole outline
+        if (tier == 4) {
+            g.setColor(Color.ORANGE);
+            g.drawOval(camX, camY, diameter, diameter);
+        }
+    }
+} 
+/**
+ * Subject: A subclass of CelestialBody for stars
+ */
+class Star extends CelestialBody {
+    private double rand; // To determine the color
+    protected static int num = 0; // A number to associate with the star
+    
+    public Star(double x, double y, double mass, double radius) {
+        super(x, y, mass, radius);
+        num++;
+        super.tier = 3;
+        super.name = "Star#" + num;
+        if (mass >= 9E30) super.color = Color.CYAN;
+        else if (mass >=  5E30) super.color = Color.WHITE;
+        else if (mass >= 6E28) super.color = Color.YELLOW;
+        else super.color = Color.RED;
+        
+        super.menu = new ContextMenu(this);
+    }
+    public Star(double x, double y, double mass, double radius, String name) {
+        this(x, y, mass, radius);
+        super.name = name;
+        
+        super.menu = new ContextMenu(this);
+    }
+    
+    public void checkColor() {
+        if (mass >= 9E30) super.color = Color.CYAN;
+        else if (mass >=  5E30) super.color = Color.WHITE;
+        else if (mass >= 6E28) super.color = Color.YELLOW;
+        else super.color = Color.RED;
+    }
+}
+/**
+ * Subject: A subclass of CelestialBody for planets
+ */
+class Planet extends CelestialBody {
+    protected static int num = 0; // A number to associate with the planet
+    
+    public Planet(double x, double y, double mass, double radius) {
+        super(x, y, mass, radius);
+        num++;
+        super.name = "Planet#" + num;
+        super.color = new Color((int)(Math.random() * 236) + 10, (int)(Math.random() * 236) + 10, (int)(Math.random() * 236) + 10); // Random initial color
+        super.tier = 2;
+        
+        super.menu = new ContextMenu(this);
+    }
+    public Planet(double x, double y, double mass, double radius, String name) {
+        this(x, y, mass, radius);
+        super.name = name;
+        
+        super.menu = new ContextMenu(this);
+    }
+}
+/**
+ * Subject: A subclass of CelestialBody for black holes
+ */
+class BlackHole extends CelestialBody {
+    protected static int num = 0; // A number to associate with the black hole
+    
+    public BlackHole(double x, double y, double mass, double radius) {
+        super(x, y, mass, radius);
+        num++;
+        super.name = "Blackhole#" + num;
+        super.tier = 4;
+        super.color = Color.BLACK;
+        
+        super.menu = new ContextMenu(this);
+    }
+    public BlackHole(double x, double y, double mass, double radius, String name) {
+        this(x, y, mass, radius);
+        super.name = name;
+        
+        super.menu = new ContextMenu(this);
+    }
+}
+/**
+ * Subject: A subclass of CelestialBody for asteroids
+ */
+class Asteroid extends CelestialBody {
+    protected static int num = 0; // A number to associate with the asteriod
+    
+    public Asteroid(double x, double y, double mass, double radius) {
+        super(x, y, mass, radius);
+        num++;
+        super.name = "Asteroid#" + num;
+        super.tier = 1;
+        super.color = Color.GRAY;
+        
+        super.menu = new ContextMenu(this);
+    }
+    public Asteroid(double x, double y, double mass, double radius, String name) {
+        this(x, y, mass, radius);
+        super.name = name;
+        
+        super.menu = new ContextMenu(this);
+    }
+}
