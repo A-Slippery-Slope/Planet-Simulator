@@ -629,8 +629,8 @@ class Simulator extends JPanel implements ActionListener, KeyListener {
         else if (frame.getWidth() * scale / zoomFactor >= 1E6) {
             scaleText = "Scale: " + String.format("%.3f", frame.getWidth() * scale / (zoomFactor * 1E6)) + "Mm/screenwidth, ";
         }
-        else if (frame.getWidth() * scale / zoomFactor >= 1E4) {
-            scaleText = "Scale: " + String.format("%.3f", frame.getWidth() * scale / (zoomFactor * 1E4)) + "km/screenwidth, ";
+        else if (frame.getWidth() * scale / zoomFactor >= 1E3) {
+            scaleText = "Scale: " + String.format("%.3f", frame.getWidth() * scale / (zoomFactor * 1E3)) + "km/screenwidth, ";
         }
         else {
             scaleText = "Scale: " + String.format("%.3f", frame.getWidth() * scale / zoomFactor) + "m/screenwidth, ";
